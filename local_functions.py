@@ -9,6 +9,26 @@
 
 # ### Tracking Data Standardization
 
+# In[ ]:
+
+
+def create_field_grid():
+
+    from itertools import product
+
+    # Define the values for each variable using numpy.linspace
+    x_values = np.linspace(0, 120, num=120)
+    y_values = np.linspace(0, 160/3, num=int(160/3))
+
+    # Generate the Cartesian product using itertools.product
+    cartesian_product = list(product(x_values, y_values))
+
+    # Convert the result to a DataFrame
+    df = pd.DataFrame(cartesian_product, columns=['x', 'y'])
+
+    return df
+
+
 # ### Distance Calculations
 
 # In[ ]:
@@ -74,8 +94,14 @@ df_all_plays.head() """
 # In[ ]:
 
 
+# difference in orientation in degrees between the way the player is facing and where the reference player is facing
+# 0 is facing directly at the reference player, 180 is directly away
+
 def calc_angle_diff(input_df, xc, yc, anglec, xc_ref, yc_ref, new_name_suffix):
 
+    import numpy as np
+    import pandas as pd
+    
     df = input_df.copy()
     xdist_col = 'x_dist_to_' + new_name_suffix
     ydist_col = 'y_dist_to_' + new_name_suffix
@@ -103,6 +129,104 @@ def calc_angle_diff(input_df, xc, yc, anglec, xc_ref, yc_ref, new_name_suffix):
     df = df.drop(['tmp', 'diff'], axis=1)
 
     return df
+
+
+# The barycentric coordinate system is a way to represent a point in a triangle using weights. For a point P(x, y) in a triangle ABC, the barycentric coordinates (u, v, w) are such that:
+# 
+# P = u * A + v * B + w * C
+
+# In[ ]:
+
+
+def project_triangle(x, y, facing_angle, yd, xd, maxX, maxY, minX, minY):
+    # Calculate base endpoint
+    x_base = x + yd * math.cos(math.radians(facing_angle))
+    y_base = y + yd * math.sin(math.radians(facing_angle))
+
+    # Calculate perpendicular sides endpoints
+    x_perp1 = x_base - xd * math.sin(math.radians(facing_angle))
+    y_perp1 = y_base + xd * math.cos(math.radians(facing_angle))
+
+    x_perp2 = x_base + xd * math.sin(math.radians(facing_angle))
+    y_perp2 = y_base - xd * math.cos(math.radians(facing_angle))
+
+    # Check and adjust for limits
+    x_perp1 = min(maxX, max(minX, x_perp1))
+    y_perp1 = min(maxY, max(minY, y_perp1))
+
+    x_perp2 = min(maxX, max(minX, x_perp2))
+    y_perp2 = min(maxY, max(minY, y_perp2))
+
+    return [(x_perp1, y_perp1), (x_base, y_base), (x_perp2, y_perp2)]
+
+
+
+
+def is_point_in_triangle(p, a, b, c):
+    """
+    Check if a point is inside a triangle using barycentric coordinates.
+
+    Parameters:
+    - p: Point to check (tuple of x, y)
+    - a, b, c: Vertices of the triangle (tuples of x, y)
+
+    Returns:
+    - True if the point is inside the triangle, False otherwise
+    """
+    def sign(p1, p2, p3):
+        return (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1])
+
+    # Normalize vertices and point
+    a_norm = (a[0] / max(a), a[1] / max(a))
+    b_norm = (b[0] / max(b), b[1] / max(b))
+    c_norm = (c[0] / max(c), c[1] / max(c))
+    p_norm = (p[0] / max(p), p[1] / max(p))
+
+    d1 = sign(p_norm, a_norm, b_norm)
+    d2 = sign(p_norm, b_norm, c_norm)
+    d3 = sign(p_norm, c_norm, a_norm)
+
+    has_neg = (d1 < 0) or (d2 < 0) or (d3 < 0)
+    has_pos = (d1 > 0) or (d2 > 0) or (d3 > 0)
+
+    return not (has_neg and has_pos)
+
+
+# In[ ]:
+
+
+# Calculate
+def line_equation(point1, point2):
+    x1, y1 = point1
+    x2, y2 = point2
+
+    # Calculate the slope
+    if x2 - x1 != 0:
+        m = (y2 - y1) / (x2 - x1)
+    else:
+        # Avoid division by zero if the points have the same x-coordinate
+        raise ValueError("The x-coordinates of the points cannot be the same")
+
+    # Calculate the y-intercept
+    b = y1 - m * x1
+
+    # Return the equation of the line
+    return f"y = {m}x + {b}"
+
+
+def perpendicular_projection(point, line_equation):
+    x0, y0 = point
+
+    # Parse the equation to extract slope (m) and y-intercept (b)
+    parts = line_equation.split()
+    m = float(parts[2][:-1])  # Extracting the slope, excluding the 'x'
+    b = float(parts[-1])      # Extracting the y-intercept
+
+    # Calculate the perpendicular projection
+    xp = (m*x0 + y0 - m*b) / (m**2 + 1)
+    yp = m * xp + b
+
+    return xp, yp
 
 
 # ### Play Animation
