@@ -1,19 +1,49 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[8]:
 
 
 #!jupyter nbconvert --to script local_functions.ipynb
 
 
+# In[ ]:
+
+
+def scale_column_to_100(dataframe, column_name):
+
+    import pandas as pd
+    from sklearn.preprocessing import MinMaxScaler
+
+
+    # Check if the column exists in the DataFrame
+    if column_name not in dataframe.columns:
+        raise ValueError(f"Column '{column_name}' not found in the DataFrame.")
+
+    # Extract the column to be scaled
+    column_to_scale = dataframe[column_name].values.reshape(-1, 1)
+
+    # Initialize MinMaxScaler
+    scaler = MinMaxScaler(feature_range=(0, 100))
+
+    # Fit and transform the column
+    scaled_column = scaler.fit_transform(column_to_scale)
+
+    # Update the DataFrame with the scaled column
+    dataframe[column_name] = scaled_column
+
+    return dataframe
+
+
 # ### Tracking Data Standardization
 
-# In[ ]:
+# In[5]:
 
 
 def create_field_grid():
 
+    import pandas as pd
+    import numpy as np
     from itertools import product
 
     # Define the values for each variable using numpy.linspace
@@ -31,10 +61,23 @@ def create_field_grid():
 
 # ### Distance Calculations
 
+# In[3]:
+
+
+def euclidean_distance(x1, y1, x2, y2):
+
+    import numpy as np
+
+    return np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+
+
 # In[ ]:
 
 
 def calc_dist_1frame(frame):
+
+    import pandas as pd
+
     # make unique positions, as to not duplicate columns based on player position
     frame['pos_unique'] = (frame['position']
                         .add(frame
@@ -131,6 +174,83 @@ def calc_angle_diff(input_df, xc, yc, anglec, xc_ref, yc_ref, new_name_suffix):
     return df
 
 
+# # Field Control
+
+# In[ ]:
+
+
+def compute_rotation_matrix(v_theta):
+
+    import numpy as np
+
+    R = np.array([[np.cos(v_theta), -np.sin(v_theta)],
+                  [np.sin(v_theta), np.cos(v_theta)]])
+    return R
+
+def compute_scaling_matrix(radius_of_influence, s_ratio):
+
+    import numpy as np
+
+    S = np.array([[radius_of_influence * (1 + s_ratio), 0],
+                  [0, radius_of_influence * (1 - s_ratio)]])
+    return S
+
+def compute_covariance_matrix(v_theta, radius_of_influence, s_ratio):
+
+    import numpy as np
+
+    R = compute_rotation_matrix(v_theta)
+    S = compute_scaling_matrix(radius_of_influence, s_ratio)
+    Sigma = np.dot(np.dot(R, S), np.dot(S, np.linalg.inv(R)))
+    return Sigma
+
+
+# In[ ]:
+
+
+# note that this is meant operate on just 1 row of the tracking dataset
+def compute_player_zoi(player_frame_tracking_data, input_field_grid):
+
+    import pandas as pd
+    import numpy as np
+    from scipy.stats import multivariate_normal
+
+    if input_field_grid is None:
+        field_grid = create_field_grid()
+    else:
+        field_grid = input_field_grid.copy()
+        
+    # gid = player_frame_tracking_data['gameId']
+    # pid = player_frame_tracking_data['playId']
+    # fid = player_frame_tracking_data['frameId']
+    # nid = player_frame_tracking_data['nflId']
+
+    zoi_center_x_ = player_frame_tracking_data['x_next']
+    zoi_center_y_ = player_frame_tracking_data['y_next']
+    v_theta_ = player_frame_tracking_data['v_theta']
+    radius_of_influence_ = player_frame_tracking_data['radius_of_influence']
+    s_ratio_ = player_frame_tracking_data['s_ratio']
+
+    mu = np.array([zoi_center_x_, zoi_center_y_])
+    Sigma = compute_covariance_matrix(v_theta_, radius_of_influence_, s_ratio_)
+
+    mvn = multivariate_normal(mean=mu, cov=Sigma)
+    influence = mvn.pdf(field_grid[['x', 'y']])
+    influence /= np.max(influence)
+
+    # player_zoi = field_grid.assign(
+    #     gameId = gid,
+    #     playId = pid,
+    #     frameId = fid,
+    #     nflId = nid,
+    #     influence=influence
+    # )
+
+    # return player_zoi
+
+    return influence
+
+
 # The barycentric coordinate system is a way to represent a point in a triangle using weights. For a point P(x, y) in a triangle ABC, the barycentric coordinates (u, v, w) are such that:
 # 
 # P = u * A + v * B + w * C
@@ -139,6 +259,11 @@ def calc_angle_diff(input_df, xc, yc, anglec, xc_ref, yc_ref, new_name_suffix):
 
 
 def project_triangle(x, y, facing_angle, yd, xd, maxX, maxY, minX, minY):
+
+    import math
+    import pandas as pd
+    import numpy as np
+
     # Calculate base endpoint
     x_base = x + yd * math.cos(math.radians(facing_angle))
     y_base = y + yd * math.sin(math.radians(facing_angle))
@@ -163,6 +288,7 @@ def project_triangle(x, y, facing_angle, yd, xd, maxX, maxY, minX, minY):
 
 
 def is_point_in_triangle(p, a, b, c):
+
     """
     Check if a point is inside a triangle using barycentric coordinates.
 
