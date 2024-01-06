@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[8]:
+# In[2]:
 
 
 #!jupyter nbconvert --to script local_functions.ipynb
@@ -35,6 +35,23 @@ def scale_column_to_100(dataframe, column_name):
     return dataframe
 
 
+# In[ ]:
+
+
+def extract_position(s):
+
+    import re
+    
+    match = re.search(r'\d', s)
+    if match:
+        return s[:match.start()]
+    else:
+        return s
+
+import numpy as np
+extract_position_vectorized = np.vectorize(extract_position)
+
+
 # ### Tracking Data Standardization
 
 # In[5]:
@@ -61,14 +78,16 @@ def create_field_grid():
 
 # ### Distance Calculations
 
-# In[3]:
+# In[1]:
 
 
-def euclidean_distance(x1, y1, x2, y2):
+def euclidean_distance_df(df, x1, y1, x2, y2, ref_name):
 
     import numpy as np
 
-    return np.sqrt((x1 - x2)**2 + (y1 - y2)**2)
+    df['dist_to_' + ref_name] = np.sqrt((df[x1] - df[x2])**2 + (df[y1] - df[y2])**2)
+
+    return df
 
 
 # In[ ]:
@@ -77,6 +96,7 @@ def euclidean_distance(x1, y1, x2, y2):
 def calc_dist_1frame(frame):
 
     import pandas as pd
+    from scipy.spatial.distance import cdist
 
     # make unique positions, as to not duplicate columns based on player position
     frame['pos_unique'] = (frame['position']
@@ -91,8 +111,8 @@ def calc_dist_1frame(frame):
 
     # calc distances 
     _df = (pd
-        .DataFrame(cdist(frame.loc[:, ['x', 'y']], 
-                        frame.loc[:, ['x', 'y']]), 
+        .DataFrame(cdist(frame.loc[:, ['x_std', 'y_std']], 
+                        frame.loc[:, ['x_std', 'y_std']]), 
                     index=frame['nflId'], 
                     columns=frame['pos_unique'].fillna('football')))
 
@@ -105,6 +125,8 @@ def calc_dist_1frame(frame):
     return frame
 
 def calc_dist_1play(play):
+
+    import pandas as pd
 
     df_all_frames = pd.DataFrame()
 
@@ -356,6 +378,32 @@ def perpendicular_projection(point, line_equation):
 
 
 # ### Play Animation
+
+# In[ ]:
+
+
+# # libraries
+
+# from scipy.stats import kde
+ 
+# # create data
+# x = df_control_1frame['x']
+# y = df_control_1frame['y']
+ 
+# # Evaluate a gaussian kde on a regular grid of nbins x nbins over data extents
+# nbins=300
+# k = kde.gaussian_kde([x,y])
+# xi, yi = np.mgrid[x.min():x.max():nbins*1j, y.min():y.max():nbins*1j]
+# zi = k(np.vstack([xi.flatten(), yi.flatten()]))
+ 
+# # Make the plot
+# plt.pcolormesh(xi, yi, zi.reshape(xi.shape), shading='auto')
+# plt.show()
+ 
+# # Change color palette
+# plt.pcolormesh(xi, yi, zi.reshape(xi.shape), shading='auto', cmap=plt.cm.Greens_r)
+# plt.show()
+
 
 # In[1]:
 
