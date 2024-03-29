@@ -2,8 +2,8 @@
 
 ### Navigation
 * local_functions - Contains variety of functions used in each of the other notebooks
-* dists - Data wrangling and feature engineering
-* model - Build tackle probability model (described below)
+* dists - Performs data wrangling and feature engineering
+* model - Builds tackle probability model (described below)
 * viz - Visualizes tracking data augmented with defender tackle probabilites for example plays
 
 ### Approach
@@ -27,4 +27,4 @@ The below play animation shows the tackle probability in action. Offensive playe
 
 You can see several players have probabilities increase dramatically as their path to the ball carrier opens up and they close in on the tackle.
 
-![](https://github.com/brandonlester/bdb24/blob/main/figs/animation_2022091101_2501.gif)
+![Animation of Tracking Data with Tackle Probabilities](https://github.com/brandonlester/bdb24/blob/main/figs/animation_2022091101_2501.gif)
